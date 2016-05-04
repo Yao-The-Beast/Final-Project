@@ -53,14 +53,7 @@ class MyBot(traders.Trader):
           be between 0 and self.timesteps - 1."""
         self.information.append(info)
         
-        # yao
-        #self.belief = (self.belief * self.alpha 
-        #                + info * 100 * (1 - self.alpha))
-        adjusted_price = numpy.random.normal(1, self.sigma) * self.belief;
-        
-        # be more sensitive to the market price change
-        #self.belief = (self.belief * self.alpha
-        #              + info * 100 * (1 - self.alpha))
+        #set skeptical to true if the market price deviates from the true value
         if info == 1:
             self.belief = self.belief
             self.skeptical = False
