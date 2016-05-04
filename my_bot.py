@@ -33,7 +33,7 @@ class MyBot(traders.Trader):
         
         self.trades = []
         self.previous_trades_num = 0
-        self.max_share = 10 * self.start_block_size
+        self.max_shares = 10 * self.start_block_size
        
         self.share = 0
         
@@ -198,7 +198,7 @@ class MyBot(traders.Trader):
                 
 def main():
     bots = [MyBot()]
-    bots.extend(other_bots.get_bots(0,10))
+    bots.extend(other_bots.get_bots(1,10))
     # Plot a single run. Useful for debugging and visualizing your
     # bot's performance. Also prints the bot's final profit, but this
     # will be very noisy.
