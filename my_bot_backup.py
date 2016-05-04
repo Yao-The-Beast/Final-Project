@@ -32,7 +32,8 @@ class MyBot(traders.Trader):
         self.sigma = 0.2
         
         self.trades = []
-        self.previous_trades_num = 0
+        self.previous_trades_num = []
+        self.previous_trades_num.append(0)
         self.max_shares = 10 * self.start_block_size
        
         self.share = 0
@@ -42,8 +43,19 @@ class MyBot(traders.Trader):
         
         self.max_trading_volume = 0
         
+
+        self.three_day_average = 0
+        self.five_day_average = 0
+        self.ten_day_average = 0
+        self.trend_warning = 0
+        self.max_three_day_change = 0.10
+        self.max_five_day_change = 0.15
+        self.max_ten_day_change = 0.20
+        
         # underpricing, long, neutral, short, underpricing
         self.position = 'neutral'
+        
+        self.round = 0
     
     def new_information(self, info, time):
         """Get information about the underlying market value.
@@ -62,6 +74,8 @@ class MyBot(traders.Trader):
         elif info == 0:
             self.belief = self.belief
             self.deviate = True
+        
+        self.round += 1
             
             
     def trades_history(self, trades, time):
@@ -72,7 +86,7 @@ class MyBot(traders.Trader):
         
         self.trades = trades
         
-        num_new_trades = len(trades) - self.previous_trades_num
+        num_new_trades = len(trades) - self.previous_trades_num[-1]
         new_trades = trades[-(num_new_trades+1):-1]
         num_bought = 0
         overall_bought_value = 0
@@ -95,48 +109,113 @@ class MyBot(traders.Trader):
         if (self.max_trading_volume < current_volume):
             self.max_trading_volume = current_volume
         
+        # get cumulative change of the stock during the recent 3,5,10 days
+        three_days = min(3, len(self.previous_trades_num))
+        five_days = min(5, len(self.previous_trades_num))
+        ten_days = min(10, len(self.previous_trades_num))
+        three_day_temp_list = trades[self.previous_trades_num[-three_days]:-1]
+        five_day_temp_list = trades[self.previous_trades_num[-five_days]:-1]
+        ten_day_temp_list = trades[self.previous_trades_num[-ten_days]:-1]
+        three_day_flag = 0
+        five_day_flag = 0
+        ten_day_flag = 0
+        if (len(three_day_temp_list) != 0):
+            #three day
+            trade_start = three_day_temp_list[0]
+            trade_end = three_day_temp_list[-1]
+            self.three_day_average = trade_end[0] / trade_start[0] - 1.0
+            
+            if (self.three_day_average > self.max_three_day_change):
+                three_day_flag = 1
+            elif (self.three_day_average < -1 * self.max_three_day_change):
+                three_day_flag = -1
+            #five day
+            trade_start = five_day_temp_list[0]
+            trade_end = five_day_temp_list[-1]
+            self.five_day_average = trade_end[0] / trade_start[0] - 1.0
+            
+            if (self.five_day_average > self.max_five_day_change):
+                five_day_flag = 1
+            elif (self.five_day_average < -1 * self.max_five_day_change):
+                five_day_flag = -1
+            #ten day
+            trade_start = ten_day_temp_list[0]
+            trade_end = ten_day_temp_list[-1]
+            self.ten_day_average = trade_end[0] / trade_start[0] - 1.0
+            
+            if (self.ten_day_average > self.max_ten_day_change):
+                ten_day_flag = 1
+            elif (self.ten_day_average < -1 * self.max_ten_day_change):
+                ten_day_flag = -1
+                
+        #set warning properly
+        self.trend_warning = three_day_flag + five_day_flag + ten_day_flag
         
+        #calculate average bought and sold price
         if num_bought != 0:
             average_bought_price = overall_bought_value / num_bought
         if num_sold != 0:
             average_sold_price = overall_sold_value / num_sold
 
-        # if long side is dominating, we raise our belief
-        if num_bought > 1.5 * num_sold:
-            # we have to compare the current volume with the max volume
-            # if the current volume is fairly large and we are dominated by the long side
-            # this can be a signal of underpricing
-            if current_volume > 0.8 * self.max_trading_volume:
-                if self.belief * (2 - self.alpha) < average_bought_price:               
-                    self.belief = max((average_bought_price + self.belief)/2, self.belief * (2 - self.alpha))
-                self.position = 'underpricing'
-            elif current_volume > 0.6 * self.max_trading_volume:
-                if self.belief * (2 - self.alpha) < average_bought_price:               
-                    self.belief = min((average_bought_price + self.belief)/2, self.belief * (2 - self.alpha))
-                self.position = 'long'
-            else:
-                self.position = 'neutral'    
-        # if short side is dominating, we lower our belief
-        elif num_sold > 1.5 * num_bought:
-            # we have to compare the current volume with the max volume
-            # if the current volume is fairly large and we are dominated by the short side
-            # this can be a signal of overpricing       
-            if current_volume > 0.8 * self.max_trading_volume:
-                if self.belief * self.alpha > average_sold_price:               
-                    self.belief = min((average_bought_price + self.belief)/2, self.belief * self.alpha)
-                self.position = 'overpricing'
-            elif current_volume > 0.6 * self.max_trading_volume:
-                if self.belief * self.alpha > average_sold_price:                    
-                    self.belief = max((average_bought_price + self.belief)/2, self.belief * self.alpha)
+
+        #if we are unsure of the current trend of the market due to its high volaitility, 
+        #we are going to adopt a more conservative strategy
+        #we are not going to stand a 'neutral' position and scale our belief in the reversed direction
+        #eg: if the market has gone through a 30% growth, we lower our own belief, vise versa
+        if (abs(self.trend_warning) > 1):
+            if (self.trend_warning > 1):
                 self.position = 'short'
+                self.belief = min((average_bought_price + self.belief)/2, self.belief * (1 - abs(self.trend_warning) * (1 - self.alpha)))
+            elif (self.trend_warning < -1):
+                self.position = 'long'
+                self.belief = max((average_bought_price + self.belief)/2, self.belief * (1 + abs(self.trend_warning) * (1 - self.alpha)))
             else:
-                self.position = 'neutral'   
+                self.position = 'neutral'  
         else:
-            self.position = 'neutral'
+            # if long side is dominating, we raise our belief
+            if num_bought > 1.5 * num_sold:
+                # we have to compare the current volume with the max volume
+                # if the current volume is fairly large and we are dominated by the long side
+                # this can be a signal of underpricing
+                if current_volume > 0.8 * self.max_trading_volume:
+                    if self.belief * (2 - self.alpha) < average_bought_price:               
+                        self.belief = max((average_bought_price + self.belief)/2, self.belief * (2 - self.alpha))
+                        self.position = 'underpricing'
+                    else:
+                        self.position = 'long'
+                elif current_volume > 0.6 * self.max_trading_volume:
+                    if self.belief * (2 - self.alpha) < average_bought_price:               
+                        self.belief = min((average_bought_price + self.belief)/2, self.belief * (2 - self.alpha))
+                        self.position = 'long'
+                    else:
+                        self.position = 'neutral'
+                else:
+                    self.position = 'neutral'    
+            # if short side is dominating, we lower our belief
+            elif num_sold > 1.5 * num_bought:
+                # we have to compare the current volume with the max volume
+                # if the current volume is fairly large and we are dominated by the short side
+                # this can be a signal of overpricing       
+                if current_volume > 0.8 * self.max_trading_volume:
+                    if self.belief * self.alpha > average_sold_price:               
+                        self.belief = min((average_bought_price + self.belief)/2, self.belief * self.alpha)
+                        self.position = 'overpricing'
+                    else:
+                        self.position = 'short'
+                elif current_volume > 0.6 * self.max_trading_volume:
+                    if self.belief * self.alpha > average_sold_price:                    
+                        self.belief = max((average_bought_price + self.belief)/2, self.belief * self.alpha)
+                        self.position = 'short'
+                    else:
+                        self.position = 'neutral'
+                else:
+                    self.position = 'neutral'   
+            else:
+                self.position = 'neutral'
                     
-        self.previous_trades_num = len(trades);
+        self.previous_trades_num.append(len(trades));
        
-        # print ('time {}, position {}'.format(time,self.position))
+        #print ('time {}, position {}'.format(time,self.position))
         
     def trading_opportunity(self, cash_callback, shares_callback,
                             check_callback, execute_callback,
@@ -158,20 +237,23 @@ class MyBot(traders.Trader):
         
         #some on spot adjustment
         
-        current_belief = (self.belief + market_belief) / 2.0
-        current_belief = max(min(current_belief, 99.0), 1.0)
-        self.belief = current_belief
+        #we need to take special care of the cumulative change of the stock pricing
+        
+        
+        #print('position: {}, deviate: {}, warning:{}, change:{}, round:{}'.format(self.position,self.deviate, self.trend_warning,self.cumulative_change,self.round))
         
         #adjust if the market price deviates from the true value
-        if (self.position == 'long' or self.position == 'underpricing'
-            and self.deviate == True):
+        if (self.position == 'long' 
+            or self.position == 'underpricing'
+                and self.deviate == True):
             self.belief += (1 - self.alpha) * self.belief
-        elif (self.position == 'short' or self.position == 'overpricing'
-            and self.deviate == True):
+        elif (self.position == 'short' 
+            or self.position == 'overpricing'
+                and self.deviate == True):
             self.belief -= (1 - self.alpha) * self.belief
         
-        #if the market_belief has a wide gap from our own spectation, 
-        #we are going to compromise by adjusting our belief
+        # #if the market_belief has a wide gap from our own spectation, 
+        # #we are going to compromise by adjusting our belief
         if (abs(market_belief - self.belief) > (1 - self.alpha) * self.belief):
             #scale up our belief
             if (market_belief > self.belief and self.position == 'long'):
@@ -185,8 +267,8 @@ class MyBot(traders.Trader):
                 self.belief -= (1 - self.alpha / 2) * self.belief
             
         
-        
-       
+        current_belief = (self.belief + market_belief) / 2.0
+        current_belief = max(min(current_belief, 99.0), 1.0)
                 
         num_bought = 0
         num_sold = 0
@@ -270,8 +352,8 @@ class MyBot(traders.Trader):
                 
 def main():
     bots = [MyBot()]
-    fundamental = 5
-    technical = 5
+    fundamental = 10
+    technical = 1
     bots.extend(other_bots.get_bots(fundamental,technical))
     print ('Fundamental: {}, Technical: {}'.format(fundamental,technical))
     # Plot a single run. Useful for debugging and visualizing your
@@ -281,7 +363,7 @@ def main():
     
     # Calculate statistics over many runs. Provides the mean and
     # standard deviation of your bot's profit.
-    run_experiments.run(bots, num_processes=2, simulations=2000, lmsr_b=250)
+    run_experiments.run(bots, num_processes=4, simulations=2000, lmsr_b=250)
 
 # Extra parameters to plot_simulation.run:
 #   timesteps=100, lmsr_b=150
