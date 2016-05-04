@@ -1,3 +1,10 @@
+#Yao
+Currently, I am able to earn profit with a relatively low standard deviation. 
+The problem is that the proportion of tech traders and fundamental traders has a great effect on the bot performance.
+Take a look at the my_bot.py. The code is heavily commented. Feel free to change.
+
+
+
 You should only need to modify my_bot.py. A rather silly example bot
 is provided.
 
