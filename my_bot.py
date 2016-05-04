@@ -33,9 +33,9 @@ class MyBot(traders.Trader):
         
         self.trades = []
         self.previous_trades_num = 0
-        self.max_stock = 10 * self.start_block_size
+        self.max_share = 10 * self.start_block_size
        
-        self.stock = 0
+        self.share = 0
         
         self.max_bought_per_round = 5
         self.max_sold_per_round = 5
@@ -79,6 +79,7 @@ class MyBot(traders.Trader):
         overall_sold_value = 0
         average_bought_price = 0
         average_sold_price = 0
+        
         # check which side is dominating
         for this_trade in new_trades:
             if this_trade[1] == 'buy':
@@ -157,80 +158,32 @@ class MyBot(traders.Trader):
             #scale up our belief
             if (market_belief > self.belief and self.position == 'long'):
                 self.belief += (1 - self.alpha) * self.belief
-                #self.position = 'long'
             #scale down our belief
             elif (market_belief < self.belief and self.position == 'short'):
                 self.belief -= (1 - self.alpha) * self.belief
-                #self.position = 'short'
         
         current_belief = (self.belief + market_belief) / 2.0
         current_belief = max(min(current_belief, 99.0), 1.0)
-        
-        
-        # num_bought = 0
-        # num_sold = 0
-        # block_size = self.start_block_size
-        # while True:
-        #     if (self.position == 'long' 
-        #         and num_bought < self.max_bought_per_round
-        #             and (check_callback('buy',block_size) < current_belief)
-        #                 and (self.stock + block_size < self.max_stock)):
-                                  
-        #         execute_callback('buy',block_size)
-        #         num_bought += 1
-        #         self.stock += block_size
                 
-        #     elif (self.position == 'short'
-        #             and num_sold < self.max_sold_per_round
-        #                 and (check_callback('sell',block_size) > current_belief)):
-                
-        #         execute_callback('sell',block_size)
-        #         num_sold += 1
-        #         self.stock -= block_size
-                
-        #     elif (self.position == 'neutral'
-        #             and (num_bought < self.max_bought_per_round)
-        #                 and (check_callback('buy',block_size) < current_belief)
-        #                     and (self.stock + block_size < self.max_stock)):
-                            
-        #             execute_callback('buy',block_size)
-        #             num_bought += 1
-        #             self.stock += block_size
-                    
-        #     elif (self.position == 'neutral'
-        #             and (num_sold < self.max_sold_per_round)
-        #                 and (check_callback('sell',block_size) > current_belief)):
-                        
-        #             execute_callback('sell',block_size)
-        #             num_bought += 1
-        #             self.stock -= block_size
-        #     elif (self.position == 'neutral'):
-        #         break;
-        #     else:
-        #         if (block_size == self.min_block_size):
-        #             break
-        #         block_size = block_size // 2
-        #         if (block_size < self.min_block_size):
-        #             block_size = self.min_block_sizea
-                
-        
-        
         num_bought = 0
         num_sold = 0
         block_size = self.start_block_size
+        
+        #repeated buy or sell (can only either buy or sell at one timestamp) 
+        #stop buying if it is hitting the upper bound of the maximum amount of shares one can hold (5 * start_block_size)
         while True:
             if (num_bought < self.max_bought_per_round 
                 and (check_callback('buy', block_size)< current_belief) 
                     and num_sold == 0
-                        and self.stock + block_size < self.max_stock):
+                        and self.share + block_size < self.max_shares):
                 execute_callback('buy',block_size)
-                self.stock += block_size
+                self.share += block_size
                 num_bought += 1
             elif (num_sold < self.max_sold_per_round
                 and num_bought == 0
                     and (check_callback('sell',block_size) > current_belief)):
                 execute_callback('sell',block_size)
-                self.stock -= block_size
+                self.share -= block_size
                 num_sold += 1
             else:
                 if block_size == self.min_block_size:
@@ -238,13 +191,14 @@ class MyBot(traders.Trader):
                 block_size = block_size // 2
                 if block_size < self.min_block_size:
                     block_size = self.min_block_size
+        # reset our belief to align with the current_belief
         self.belief = current_belief
         
         
                 
 def main():
     bots = [MyBot()]
-    bots.extend(other_bots.get_bots(10,0))
+    bots.extend(other_bots.get_bots(0,10))
     # Plot a single run. Useful for debugging and visualizing your
     # bot's performance. Also prints the bot's final profit, but this
     # will be very noisy.
