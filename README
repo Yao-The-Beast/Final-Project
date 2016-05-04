@@ -1,7 +1,25 @@
 #Yao
+
+#Update 0.1
+Right now I have tried use a dummy fundamental trader (the one used in the other_bots). 
+In that case, its profit is around 5,000 with a 30k standard deviation.
+You can uncomment the fundamental trader in my_bot and comment the bot we wrote to run a santity test.
+Yet, the bot we implemented managed to get a little more profit than the fundamental trader 
+while having a much smaller std of 7,000.
+
+The problem we have right now is that if we have only 1 fundamental & 10 technical traders,
+our bot was outperformed by the fundamental (almost 50 times) as it was heavily influenced by technical traders (noises)
+However, if we have 10 fundamental & 1 technical traders,
+our bot outperformed the fundamental by gaining twice as much profit and a much lower std deviation.
+
+
+
+#Update 0.0
 Currently, I am able to earn profit with a relatively low standard deviation. 
 The problem is that the proportion of tech traders and fundamental traders has a great effect on the bot performance.
 Take a look at the my_bot.py. The code is heavily commented. Feel free to change.
+
+
 
 
 

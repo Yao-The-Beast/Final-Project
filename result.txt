@@ -1,0 +1,28 @@
+Fundamental: 5, Technical: 5
+LMSR (b=250.00) profit: -4991.99 (min -17214.66, max 9141.66, 2000 samples)
+    fund_moving_average profit: 27692.85 (-373165.32 min, 555918.33 max, 47051.08 std, 2000 samples)
+    my_bot profit: 5793.85 (-246840.79 min, 396920.81 max, 34677.18 std, 2000 samples)
+
+Fundamental: 1, Technical 5
+LSMR (b=250.00) profit: -4281.42 (min -17274.00, max 16189.83, 2000 samples)
+    fund_moving_average profit: 36962.30 (-218713.93 min, 323114.84 max, 37150.96 std, 2000 samples)
+    my_bot profit: 1928.19 (-53084.53 min, 81349.67 max, 7672.86 std, 2000 samples)
+    tech_range profit: -2064.95 (-131147.44 min, 17177.10 max, 7306.19 std, 2000 samples)
+    tech_short_long profit: -32544.11 (-404653.97 min, 230534.94 max, 39757.83 std, 2000 samples)
+    tech_short_long profit: -22493.69 (-350646.11 min, 387692.15 max, 37446.08 std, 2000 samples)
+
+Fundamental: 1, Technical: 10
+LMSR (b=250.00) profit: -3737.94 (min -17321.39, max 29480.68, 2000 samples)
+    fund_moving_average profit: 59908.85 (-400307.06 min, 815457.65 max, 66936.60 std, 2000 samples)
+    my_bot profit: 1153.19 (-51273.64 min, 76580.26 max, 9218.32 std, 2000 samples)
+    tech_range profit: -3910.73 (-200841.64 min, 21324.09 max, 12535.03 std, 2000 samples)
+    tech_short_long profit: -53413.37 (-910383.39 min, 374082.00 max, 71334.73 std, 2000 samples)
+
+Fundamental: 10, Technical: 1
+LMSR (b=250.00) profit: -5086.09 (min -17079.63, max 6775.01, 2000 samples)
+    fund_moving_average profit: 2455.66 (-68990.30 min, 95708.37 max, 12847.40 std, 2000 samples)
+    my_bot profit: 5296.86 (-46456.96 min, 67537.60 max, 7825.24 std, 2000 samples)
+    tech_range profit: -2666.43 (-77804.10 min, 34722.14 max, 6036.42 std, 2000 samples)
+
+
+
