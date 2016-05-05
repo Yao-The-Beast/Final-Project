@@ -4,6 +4,7 @@ import traders
 import run_experiments
 import plot_simulation
 import numpy
+import math
 
 class MyBot(traders.Trader):
     name = 'my_bot'
@@ -37,6 +38,8 @@ class MyBot(traders.Trader):
        
         self.share = 0
         
+        self.current_time = 0
+        
         self.max_bought_per_round = 5
         self.max_sold_per_round = 5
         
@@ -44,7 +47,22 @@ class MyBot(traders.Trader):
         
         # underpricing, long, neutral, short, underpricing
         self.position = 'neutral'
-    
+        
+        #Average Expectation and Confidence Level
+        self.twenty_days_confidence = 0
+        self.twenty_days_average = 0
+        self.valuation = 0
+        #another share pool to be responsible 
+        self.start_block_size_2 = 20
+        self.share_2 = 0 
+        self.max_pool_2 = 30 * self.start_block_size_2
+        # force long, force short, neutral
+        self.position_2 = 'netural'
+        # need a certain amount of time to cool down the judgement
+        self.buffer_period = 20
+        
+        
+        
     def new_information(self, info, time):
         """Get information about the underlying market value.
         
@@ -62,7 +80,18 @@ class MyBot(traders.Trader):
         elif info == 0:
             self.belief = self.belief
             self.deviate = True
-            
+        
+        #20 day average
+        if (len(self.information) >= 20):
+            thisInfo = self.information[-20:-1]
+            n = len(thisInfo)
+            k = sum(thisInfo)     
+            if (k != 0):
+                p = float(k) / float(n)
+                self.twenty_days_confidence = math.factorial(n) / (math.factorial(n-k) * math.factorial(k)) * pow(p,k) * pow(1-p,n-k)
+                self.twenty_days_average = p * 100
+                self.valuation = self.twenty_days_average
+       
             
     def trades_history(self, trades, time):
         """A list of everyone's trades, in the following format:
@@ -154,22 +183,27 @@ class MyBot(traders.Trader):
         Note that a bot can always buy and sell: the bot will borrow
         shares or cash automatically.
         """
+      
+        if (self.valuation != 0):
+            self.valuation = (self.valuation + market_belief) / 2
+        self.current_time += 1
+        #print('time:{}, my value:{}, market_belief: {}'.format(self.current_time,self.valuation, market_belief))
+        if (self.valuation != 0 and self.valuation  > 1.0 * market_belief):
+            if (self.share_2 < self.max_pool_2):
+                 execute_callback('buy',self.start_block_size_2)
+                 self.share_2 += self.start_block_size_2
+                
+        elif (self.valuation != 0 and self.valuation  < 1.0 * market_belief):
+            if (self.share_2 > 0):
+                execute_callback('sell',self.start_block_size_2)
+                self.share_2 -= self.start_block_size_2
+           
         
-        
-        #some on spot adjustment
-        
+        #some on spot adjustment       
         current_belief = (self.belief + market_belief) / 2.0
         current_belief = max(min(current_belief, 99.0), 1.0)
         self.belief = current_belief
-        
-        #adjust if the market price deviates from the true value
-        if (self.position == 'long' or self.position == 'underpricing'
-            and self.deviate == True):
-            self.belief += (1 - self.alpha) * self.belief
-        elif (self.position == 'short' or self.position == 'overpricing'
-            and self.deviate == True):
-            self.belief -= (1 - self.alpha) * self.belief
-        
+               
         #if the market_belief has a wide gap from our own spectation, 
         #we are going to compromise by adjusting our belief
         if (abs(market_belief - self.belief) > (1 - self.alpha) * self.belief):
@@ -183,10 +217,6 @@ class MyBot(traders.Trader):
                 self.belief -= (1 - self.alpha / 2) * self.belief
             elif (market_belief < self.belief and self.position == 'overpricing'):
                 self.belief -= (1 - self.alpha / 2) * self.belief
-            
-        
-        
-       
                 
         num_bought = 0
         num_sold = 0
@@ -216,72 +246,23 @@ class MyBot(traders.Trader):
                     block_size = self.min_block_size
         # reset our belief to align with the current_belief
         self.belief = current_belief
-    
-    ###### the commented part is just a copy of the fundamental trader
-    # def simulation_params(self, timesteps,
-    #                       possible_jump_locations,
-    #                       single_jump_probability,
-    #                       start_belief=50.0,
-    #                       alpha=0.9,
-    #                       min_block_size=2,
-    #                       start_block_size=20):
-    #     self.timesteps = timesteps
-    #     self.possible_jump_locations = possible_jump_locations
-    #     self.single_jump_probability = single_jump_probability
-    #     self.belief = start_belief
-    #     self.alpha = alpha
-    #     self.min_block_size = min_block_size
-    #     self.start_block_size = start_block_size
-    
-    # def new_information(self, info, time):
-    #     self.belief = (self.belief * self.alpha
-    #                    + info * 100 * (1 - self.alpha))
 
-    # def trades_history(self, trades, time):
-    #     self.trades = trades
-
-    # def trading_opportunity(self, cash_callback, shares_callback,
-    #                         check_callback, execute_callback,
-    #                         market_belief):
-    #     current_belief = (self.belief + market_belief) / 2.0
-    #     current_belief = max(min(current_belief, 99.0), 1.0)
-    #     bought_once = False
-    #     sold_once = False
-    #     block_size = self.start_block_size
-    #     while True:
-    #         if (not sold_once
-    #             and (check_callback('buy', block_size)
-    #                  < current_belief)):
-    #             execute_callback('buy', block_size)
-    #             bought_once = True
-    #         elif (not bought_once
-    #               and (check_callback('sell', block_size)
-    #                    > current_belief)):
-    #             execute_callback('sell', block_size)
-    #             sold_once = True
-    #         else:
-    #             if block_size == self.min_block_size:
-    #                 break
-    #             block_size = block_size // 2
-    #             if block_size < self.min_block_size:
-    #                 block_size = self.min_block_size
-        
         
                 
 def main():
     bots = [MyBot()]
-    fundamental = 5
-    technical = 5
+    fundamental = 1
+    technical = 10
     bots.extend(other_bots.get_bots(fundamental,technical))
     print ('Fundamental: {}, Technical: {}'.format(fundamental,technical))
     # Plot a single run. Useful for debugging and visualizing your
     # bot's performance. Also prints the bot's final profit, but this
     # will be very noisy.
-    #plot_simulation.run(bots, 200, lmsr_b=250)
+    #plot_simulation.run(bots, 100, lmsr_b=250)
     
     # Calculate statistics over many runs. Provides the mean and
     # standard deviation of your bot's profit.
-    run_experiments.run(bots, num_processes=2, simulations=2000, lmsr_b=250)
+    run_experiments.run(bots, num_processes=4, simulations=1000, lmsr_b=250)
 
 # Extra parameters to plot_simulation.run:
 #   timesteps=100, lmsr_b=150
