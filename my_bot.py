@@ -73,13 +73,16 @@ class MyBot(traders.Trader):
           be between 0 and self.timesteps - 1."""
         self.information.append(info)
         
-        #set deviate to 0 if the market price deviates from the true value
-        self.belief = (self.belief * self.alpha
-                       + info * 100 * (1 - self.alpha))
+        # we use the alpha and info here to compensate the possible jump of the stock price
+        self.belief = (self.belief * self.alpha + info * 100 * (1 - self.alpha))
         
         #20 day average
-        if (len(self.information) >= 20):
-            thisInfo = self.information[-20:-1]
+        #this 50 days average depends only on the info
+        #we derive the true average stock price by taking the derivatives of binomial distribution
+        #and we calucate the Probability of the ture stock price = our believed stock price by using a formula
+        #https://en.wikipedia.org/wiki/Binomial_distribution
+        if (len(self.information) >= 50):
+            thisInfo = self.information[-50:-1]
             n = len(thisInfo)
             k = sum(thisInfo)     
             if (k != 0):
@@ -87,7 +90,6 @@ class MyBot(traders.Trader):
                 self.twenty_days_confidence = math.factorial(n) / (math.factorial(n-k) * math.factorial(k)) * pow(p,k) * pow(1-p,n-k)
                 self.twenty_days_average = p * 100
                 self.valuation = self.twenty_days_average
-       
             
     def trades_history(self, trades, time):
         """A list of everyone's trades, in the following format:
@@ -120,7 +122,7 @@ class MyBot(traders.Trader):
         if (self.max_trading_volume < current_volume):
             self.max_trading_volume = current_volume
         
-        
+        #calculate average price
         if num_bought != 0:
             average_bought_price = overall_bought_value / num_bought
         if num_sold != 0:
@@ -180,7 +182,15 @@ class MyBot(traders.Trader):
         shares or cash automatically.
         """
       
+        #mechanism #1
+        #we use the 20 days average to decide our actions
+        
+        #if the market belief is higher than our valuation of the stock price, we long the stock
+        #otherwise we short the stock
+        #there is a bound on how many stocks we can possibly hold in this mechanism
         self.current_time += 1
+        if (self.valuation != 0):
+            self.valuation = (self.valuation + market_belief) / 2
         #print('time:{}, my value:{}, market_belief: {}'.format(self.current_time,self.valuation, market_belief))
         if (self.valuation != 0 and self.valuation  > 1.0 * market_belief):
             if (self.share_2 < self.max_pool_2):
@@ -192,14 +202,18 @@ class MyBot(traders.Trader):
                 execute_callback('sell',self.start_block_size_2)
                 self.share_2 -= self.start_block_size_2
            
+           
+        #mechanism #2
+        #a hybrid of technical and market info
         
-        #some on spot adjustment       
+        #some on spot adjustment to reconcile the market_belief with our own belief   
         current_belief = (self.belief + market_belief) / 2.0
         current_belief = max(min(current_belief, 99.0), 1.0)
         self.belief = current_belief
                
         #if the market_belief has a wide gap from our own spectation, 
         #we are going to compromise by adjusting our belief
+        #we scale up/down more for 'overpricing' and 'underpricing'
         if (abs(market_belief - self.belief) > (1 - self.alpha) * self.belief):
             #scale up our belief
             if (market_belief > self.belief and self.position == 'long'):
@@ -245,8 +259,8 @@ class MyBot(traders.Trader):
                 
 def main():
     bots = [MyBot()]
-    fundamental = 10
-    technical = 1
+    fundamental = 5
+    technical = 5
     bots.extend(other_bots.get_bots(fundamental,technical))
     print ('Fundamental: {}, Technical: {}'.format(fundamental,technical))
     # Plot a single run. Useful for debugging and visualizing your
@@ -256,7 +270,7 @@ def main():
     
     # Calculate statistics over many runs. Provides the mean and
     # standard deviation of your bot's profit.
-    run_experiments.run(bots, num_processes=4, simulations=1000, lmsr_b=250)
+    run_experiments.run(bots, timesteps=200, num_processes=4, simulations=1000, lmsr_b=250)
 
 # Extra parameters to plot_simulation.run:
 #   timesteps=100, lmsr_b=150
