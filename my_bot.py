@@ -74,12 +74,8 @@ class MyBot(traders.Trader):
         self.information.append(info)
         
         #set deviate to 0 if the market price deviates from the true value
-        if info == 1:
-            self.belief = self.belief
-            self.deviate = False
-        elif info == 0:
-            self.belief = self.belief
-            self.deviate = True
+        self.belief = (self.belief * self.alpha
+                       + info * 100 * (1 - self.alpha))
         
         #20 day average
         if (len(self.information) >= 20):
@@ -184,8 +180,6 @@ class MyBot(traders.Trader):
         shares or cash automatically.
         """
       
-        if (self.valuation != 0):
-            self.valuation = (self.valuation + market_belief) / 2
         self.current_time += 1
         #print('time:{}, my value:{}, market_belief: {}'.format(self.current_time,self.valuation, market_belief))
         if (self.valuation != 0 and self.valuation  > 1.0 * market_belief):
@@ -251,8 +245,8 @@ class MyBot(traders.Trader):
                 
 def main():
     bots = [MyBot()]
-    fundamental = 1
-    technical = 10
+    fundamental = 10
+    technical = 1
     bots.extend(other_bots.get_bots(fundamental,technical))
     print ('Fundamental: {}, Technical: {}'.format(fundamental,technical))
     # Plot a single run. Useful for debugging and visualizing your
